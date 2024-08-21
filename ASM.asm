@@ -19,7 +19,7 @@ section .data
     reg_ebx db 0x03
 
     ; Format strings
-    fmt_string db "%s", 0
+    fmt_string db `%[^\n]`, 0
     fmt_hex db "%02X ", 0
     fmt_dec db "%d", 0
 
@@ -32,7 +32,7 @@ section .bss
     atoi_result resd 1
 
 section .text
-    extern printf, scanf, ExitProcess, sscanf
+    extern printf, scanf, ExitProcess, sscanf, atoi, strcmp
     global main
 
 main:
@@ -62,15 +62,13 @@ main:
     lea rcx, [rel output_msg]
     call printf
 
-    mov rcx, 0
     mov ecx, [rel op_len]
-    mov rsi, opcode
+    lea rsi, [rel opcode]
 display_loop:
-    cmp rcx, rdx
+    cmp rcx, 0
     je display_end
-    mov al, [rsi]
+    movzx rdx, byte [rsi]
     lea rcx, [rel fmt_hex]
-    movzx rdx, al
     call printf
     inc rsi
     dec ecx
@@ -79,7 +77,7 @@ display_loop:
 display_end:
     ; New line
     lea rcx, [rel fmt_string]
-    lea rdx, [10]    ; ASCII newline
+    mov rdx, 10    ; ASCII newline
     call printf
 
     ; Clean up and exit
@@ -113,13 +111,13 @@ parse_instruction:
     mov dword [rel op_len], 0
 
     ; Extract operation and operands
-    lea r9, [rel operation]
-    lea r10, [rel operand1]
-    lea r11, [rel operand2]
+    lea r9, [rel operand1]
+    lea r10, [rel operand2]
+    lea r11, [rel operation]
     lea rax, [rel fmt_string]
     mov rcx, rax
-    mov rdx, rcx
-    mov r8, rcx
+    mov rdx, r9
+    mov r8, r10
     lea rax, [rel instruction]
     call sscanf_wrapper
 
@@ -166,8 +164,8 @@ handle_mov:
 handle_add:
     ; ADD reg1, reg2
     ; opcode: 0x01 | modrm_byte
-    mov al, byte [rel opcode_add]          ; Move byte value from opcode_add to AL register
-    mov [rel opcode], al                   ; Then move the byte value from AL to the memory location at opcode
+    mov al, [rel opcode_add]
+    mov [rel opcode], al
     mov rdi, [rel operand1]
     mov rsi, [rel operand2]
     call get_modrm_byte
@@ -179,8 +177,8 @@ handle_add:
 handle_sub:
     ; SUB reg1, reg2
     ; opcode: 0x29 | modrm_byte
-    mov al, [rel opcode_sub]               ; Load byte from opcode_sub into AL register
-    mov [rel opcode], al                   ; Store byte from AL into the memory location at opcode
+    mov al, [rel opcode_sub]
+    mov [rel opcode], al
     mov rdi, [rel operand1]
     mov rsi, [rel operand2]
     call get_modrm_byte
@@ -192,8 +190,8 @@ handle_sub:
 handle_jmp:
     ; JMP rel32
     ; opcode: 0xE9 | offset (4 bytes)
-    mov al, [rel opcode_jmp]               ; Load byte from opcode_jmp into AL register
-    mov [rel opcode], al                   ; Store byte from AL into the memory location at opcode
+    mov al, [rel opcode_jmp]
+    mov [rel opcode], al
     mov rdi, [rel operand1]
     call atoi_wrapper
     mov eax, [rel atoi_result]
@@ -335,7 +333,7 @@ str_compare_jmp:
 str_compare_eax:
     push rbp
     mov rbp, rsp
-    mov rdi, [rdi]
+    mov rdi, [rel operand1]
     lea rsi, [rel eax_str]
     call strcmp
     pop rbp
@@ -344,7 +342,7 @@ str_compare_eax:
 str_compare_ecx:
     push rbp
     mov rbp, rsp
-    mov rdi, [rdi]
+    mov rdi, [rel operand1]
     lea rsi, [rel ecx_str]
     call strcmp
     pop rbp
@@ -353,7 +351,7 @@ str_compare_ecx:
 str_compare_edx:
     push rbp
     mov rbp, rsp
-    mov rdi, [rdi]
+    mov rdi, [rel operand1]
     lea rsi, [rel edx_str]
     call strcmp
     pop rbp
@@ -362,41 +360,41 @@ str_compare_edx:
 str_compare_ebx:
     push rbp
     mov rbp, rsp
-    mov rdi, [rdi]
+    mov rdi, [rel operand1]
     lea rsi, [rel ebx_str]
     call strcmp
     pop rbp
     ret
 
-; strcmp implementation
-strcmp:
+; Wrapper for atoi
+atoi_wrapper:
     push rbp
     mov rbp, rsp
-    mov rcx, -1
-    xor al, al
-    repe cmpsb
-    sete al
+    mov rdi, [rel operand2]
+    call atoi
+    mov [rel atoi_result], eax
     pop rbp
     ret
 
-; atoi wrapper
-atoi_wrapper:
-    ; TODO: Implement atoi function or use C library
-    ret
-
-; sscanf wrapper
+; Wrapper for sscanf
 sscanf_wrapper:
-    ; TODO: Implement or link to sscanf function
+    push rbp
+    mov rbp, rsp
+    mov rdi, [rel instruction]
+    mov rsi, [rel operation]
+    mov rdx, [rel operand1]
+    mov rcx, [rel operand2]
+    call sscanf
+    pop rbp
     ret
 
-; String constants
-section .data
-    operation db 10, 0
-    mov_str db "mov", 0
-    add_str db "add", 0
-    sub_str db "sub", 0
-    jmp_str db "jmp", 0
-    eax_str db "eax", 0
-    ecx_str db "ecx", 0
-    edx_str db "edx", 0
-    ebx_str db "ebx", 0
+; String literals for comparison
+operation db 10, 0
+mov_str db "mov", 0
+add_str db "add", 0
+sub_str db "sub", 0
+jmp_str db "jmp", 0
+eax_str db "eax", 0
+ecx_str db "ecx", 0
+edx_str db "edx", 0
+ebx_str db "ebx", 0
