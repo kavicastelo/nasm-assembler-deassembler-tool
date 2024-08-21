@@ -19,7 +19,7 @@ section .data
     reg_ebx db 0x03
 
     ; Format strings
-    fmt_string db `%[^\n]`, 0
+    fmt_string db "%s", 0
     fmt_hex db "%02X ", 0
     fmt_dec db "%d", 0
 
@@ -30,6 +30,7 @@ section .bss
     operand1 resb 10        ; Buffer for operand1
     operand2 resb 10        ; Buffer for operand2
     atoi_result resd 1
+    operation resb 5
 
 section .text
     extern printf, scanf, ExitProcess, sscanf, atoi, strcmp
@@ -65,7 +66,7 @@ main:
     mov ecx, [rel op_len]
     lea rsi, [rel opcode]
 display_loop:
-    cmp rcx, 0
+    cmp ecx, 0
     je display_end
     movzx rdx, byte [rsi]
     lea rcx, [rel fmt_hex]
@@ -104,8 +105,7 @@ invalid_instruction:
 ;   [op_len] - length of machine code
 ; -----------------------------------------
 parse_instruction:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
 
     ; Initialize op_len to 0
     mov dword [rel op_len], 0
@@ -201,7 +201,7 @@ handle_jmp:
     jmp parse_end
 
 parse_end:
-    pop rbp
+    add rsp, 32      ; Clean up shadow space
     ret
 
 ; -----------------------------------------
@@ -213,8 +213,7 @@ parse_end:
 ;   al - register code or 0xFF if invalid
 ; -----------------------------------------
 get_register_code:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
 
     lea rax, [rdi]
     call str_compare_eax
@@ -253,7 +252,7 @@ reg_ebx_label:
     jmp reg_code_end
 
 reg_code_end:
-    pop rbp
+    add rsp, 32      ; Clean up shadow space
     ret
 
 ; -----------------------------------------
@@ -266,8 +265,7 @@ reg_code_end:
 ;   al - ModRM byte
 ; -----------------------------------------
 get_modrm_byte:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
 
     ; Get dest register code
     mov rdi, [rdi]
@@ -285,7 +283,7 @@ get_modrm_byte:
     or al, bh
     or al, bl
 
-    pop rbp
+    add rsp, 32      ; Clean up shadow space
     ret
 
 ; -----------------------------------------
@@ -295,101 +293,110 @@ get_modrm_byte:
 
 ; strcmp functions
 str_compare_mov:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operation]
     lea rsi, [rel mov_str]
     call strcmp
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 str_compare_add:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operation]
     lea rsi, [rel add_str]
     call strcmp
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 str_compare_sub:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operation]
     lea rsi, [rel sub_str]
     call strcmp
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 str_compare_jmp:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operation]
     lea rsi, [rel jmp_str]
     call strcmp
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 str_compare_eax:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operand1]
     lea rsi, [rel eax_str]
     call strcmp
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 str_compare_ecx:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operand1]
     lea rsi, [rel ecx_str]
     call strcmp
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 str_compare_edx:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operand1]
     lea rsi, [rel edx_str]
     call strcmp
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 str_compare_ebx:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operand1]
     lea rsi, [rel ebx_str]
     call strcmp
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 ; Wrapper for atoi
 atoi_wrapper:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel operand2]
     call atoi
     mov [rel atoi_result], eax
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 ; Wrapper for sscanf
 sscanf_wrapper:
-    push rbp
-    mov rbp, rsp
+    sub rsp, 32      ; Allocate shadow space
+
     mov rdi, [rel instruction]
     mov rsi, [rel operation]
     mov rdx, [rel operand1]
     mov rcx, [rel operand2]
     call sscanf
-    pop rbp
+
+    add rsp, 32      ; Clean up shadow space
     ret
 
 ; String literals for comparison
-operation db 10, 0
 mov_str db "mov", 0
 add_str db "add", 0
 sub_str db "sub", 0
